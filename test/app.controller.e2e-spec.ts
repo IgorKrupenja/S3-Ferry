@@ -666,4 +666,216 @@ describe('AppController (e2e)', () => {
       expect(body.message).toContain('azure-testaccount1');
     });
   });
+
+  describe('POST /v1/files/signed-url/upload', () => {
+    beforeAll(async () => {
+      // Create quarantine and production buckets before running tests
+      const s3Config = app.get(s3ConfigFactory.KEY);
+      const s3Client = new S3Client({
+        credentials: {
+          accessKeyId: s3Config.accessKeyId,
+          secretAccessKey: s3Config.secretAccessKey,
+        },
+        ...(s3Config.endpointUrl && { endpoint: s3Config.endpointUrl }),
+        forcePathStyle: true,
+        region: s3Config.region,
+      });
+
+      await ensureS3BucketExists(s3Client, 'quarantine');
+      await ensureS3BucketExists(s3Client, 'production');
+    });
+
+    it('should generate a signed upload URL for quarantine bucket', async () => {
+      const data = {
+        fileName: 'test-upload.pdf',
+        fileSize: 1024,
+        mimeType: 'application/pdf',
+      };
+
+      const { status, body } = await request(app.getHttpServer())
+        .post('/v1/files/signed-url/upload')
+        .send(data);
+
+      expect(status).toBe(HttpStatus.CREATED);
+      expect(body).toHaveProperty('url');
+      expect(body).toHaveProperty('expiresAt');
+      expect(body).toHaveProperty('bucket', 'quarantine');
+      expect(body).toHaveProperty('key', 'test-upload.pdf');
+      expect(body.url).toContain('test-upload.pdf');
+      expect(body.url).toContain('X-Amz-Signature');
+    });
+
+    it('should generate a signed upload URL for custom bucket', async () => {
+      const data = {
+        fileName: 'test-custom.pdf',
+        fileSize: 2048,
+        mimeType: 'application/pdf',
+        bucket: 'production',
+      };
+
+      const { status, body } = await request(app.getHttpServer())
+        .post('/v1/files/signed-url/upload')
+        .send(data);
+
+      expect(status).toBe(HttpStatus.CREATED);
+      expect(body).toHaveProperty('bucket', 'production');
+      expect(body.url).toContain('test-custom.pdf');
+    });
+
+    it('should allow file upload using signed URL', async () => {
+      const data = {
+        fileName: 'real-upload-test.txt',
+        fileSize: 100,
+        mimeType: 'text/plain',
+      };
+
+      // Get signed URL
+      const { body } = await request(app.getHttpServer())
+        .post('/v1/files/signed-url/upload')
+        .send(data);
+
+      // Upload file using the signed URL
+      const fileContent = 'This is a test file content';
+      const uploadResponse = await fetch(body.url, {
+        method: 'PUT',
+        body: fileContent,
+        headers: {
+          'Content-Type': 'text/plain',
+        },
+      });
+
+      expect(uploadResponse.ok).toBe(true);
+      expect(uploadResponse.status).toBe(HttpStatus.OK);
+    });
+
+    it('should fail with missing required fields', async () => {
+      const data = {
+        fileName: 'test.pdf',
+        // Missing fileSize and mimeType
+      };
+
+      const { status } = await request(app.getHttpServer())
+        .post('/v1/files/signed-url/upload')
+        .send(data);
+
+      expect(status).toBe(HttpStatus.BAD_REQUEST);
+    });
+
+    it('should fail with invalid data types', async () => {
+      const data = {
+        fileName: 'test.pdf',
+        fileSize: 'not-a-number', // Should be number
+        mimeType: 'application/pdf',
+      };
+
+      const { status } = await request(app.getHttpServer())
+        .post('/v1/files/signed-url/upload')
+        .send(data);
+
+      expect(status).toBe(HttpStatus.BAD_REQUEST);
+    });
+  });
+
+  describe('POST /v1/files/signed-url/download', () => {
+    beforeAll(async () => {
+      // Create production bucket and upload a test file
+      const s3Config = app.get(s3ConfigFactory.KEY);
+      const s3Client = new S3Client({
+        credentials: {
+          accessKeyId: s3Config.accessKeyId,
+          secretAccessKey: s3Config.secretAccessKey,
+        },
+        ...(s3Config.endpointUrl && { endpoint: s3Config.endpointUrl }),
+        forcePathStyle: true,
+        region: s3Config.region,
+      });
+
+      await ensureS3BucketExists(s3Client, 'production');
+
+      // Upload a test file to production bucket
+      const { PutObjectCommand } = await import('@aws-sdk/client-s3');
+      await s3Client.send(
+        new PutObjectCommand({
+          Bucket: 'production',
+          Key: 'test-download.txt',
+          Body: 'Test file content for download',
+          ContentType: 'text/plain',
+        }),
+      );
+    });
+
+    it('should generate a signed download URL for production bucket', async () => {
+      const data = {
+        fileName: 'test-download.txt',
+      };
+
+      const { status, body } = await request(app.getHttpServer())
+        .post('/v1/files/signed-url/download')
+        .send(data);
+
+      expect(status).toBe(HttpStatus.CREATED);
+      expect(body).toHaveProperty('url');
+      expect(body).toHaveProperty('expiresAt');
+      expect(body).toHaveProperty('bucket', 'production');
+      expect(body).toHaveProperty('key', 'test-download.txt');
+      expect(body.url).toContain('test-download.txt');
+      expect(body.url).toContain('X-Amz-Signature');
+    });
+
+    it('should generate a signed download URL for custom bucket', async () => {
+      const data = {
+        fileName: 'test-file.txt',
+        bucket: 'quarantine',
+      };
+
+      const { status, body } = await request(app.getHttpServer())
+        .post('/v1/files/signed-url/download')
+        .send(data);
+
+      expect(status).toBe(HttpStatus.CREATED);
+      expect(body).toHaveProperty('bucket', 'quarantine');
+    });
+
+    it('should allow file download using signed URL', async () => {
+      const data = {
+        fileName: 'test-download.txt',
+      };
+
+      // Get signed URL
+      const { body } = await request(app.getHttpServer())
+        .post('/v1/files/signed-url/download')
+        .send(data);
+
+      // Download file using the signed URL
+      const downloadResponse = await fetch(body.url);
+
+      expect(downloadResponse.ok).toBe(true);
+      expect(downloadResponse.status).toBe(HttpStatus.OK);
+
+      const content = await downloadResponse.text();
+      expect(content).toBe('Test file content for download');
+    });
+
+    it('should fail with missing fileName', async () => {
+      const data = {};
+
+      const { status } = await request(app.getHttpServer())
+        .post('/v1/files/signed-url/download')
+        .send(data);
+
+      expect(status).toBe(HttpStatus.BAD_REQUEST);
+    });
+
+    it('should fail with invalid data types', async () => {
+      const data = {
+        fileName: 123, // Should be string
+      };
+
+      const { status } = await request(app.getHttpServer())
+        .post('/v1/files/signed-url/download')
+        .send(data);
+
+      expect(status).toBe(HttpStatus.BAD_REQUEST);
+    });
+  });
 });
