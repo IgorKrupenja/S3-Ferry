@@ -1,11 +1,13 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
 
 import { AzureAccountService, AzureBlobService } from '../azure/services';
+import { appConfigFactory } from '../common/config';
 import {
   CopyFileBodyDto,
   CreateFileBodyDto,
@@ -23,6 +25,7 @@ import {
   FileNotFoundException,
   InternalServerException,
 } from '../common/exceptions';
+import { AppConfig } from '../common/interfaces';
 import { FsService } from '../fs';
 import { S3Service } from '../s3';
 
@@ -31,6 +34,8 @@ export class AppService {
   private readonly logger = new Logger(AppService.name);
 
   constructor(
+    @Inject(appConfigFactory.KEY)
+    private readonly appConfig: AppConfig,
     private readonly fsService: FsService,
     private readonly s3Service: S3Service,
     private readonly azureAccountService: AzureAccountService,
@@ -192,7 +197,7 @@ export class AppService {
         data.mimeType,
         bucket,
         data.fileSize,
-        10485760, // 10MB max file size
+        this.appConfig.maxFileSize,
         3600, // 1 hour expiration
       );
 

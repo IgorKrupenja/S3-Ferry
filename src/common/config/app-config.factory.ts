@@ -11,6 +11,7 @@ export const appConfigFactory = registerAs('api', (): AppConfig => {
   return {
     corsOrigin: split(<string>env['API_CORS_ORIGIN']),
     documentationEnabled: <boolean>env['API_DOCUMENTATION_ENABLED'],
+    maxFileSize: <number>env['API_MAX_FILE_SIZE'],
   };
 });
 
