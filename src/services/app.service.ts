@@ -233,7 +233,7 @@ export class AppService {
     }
   }
 
-  async simulateAvScan(fileName: string): Promise<void> {
+  async simulateAvAndMimeScan(fileName: string): Promise<void> {
     // Simulate AV scan delay (5 seconds)
     await new Promise((resolve) => setTimeout(resolve, 5000));
 

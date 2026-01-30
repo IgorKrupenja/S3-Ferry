@@ -93,7 +93,8 @@ export class AppController {
     const result = await this.appService.generateSignedUploadUrl(data);
 
     // Trigger AV scan simulation in background (fire and forget)
-    void this.appService.simulateAvScan(data.fileName);
+    // TODO: This is only a quick PoC to simulate AV and MIME scan
+    void this.appService.simulateAvAndMimeScan(data.fileName);
 
     return result;
   }
