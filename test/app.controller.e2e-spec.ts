@@ -808,6 +808,7 @@ describe('AppController (e2e)', () => {
       await ensureS3BucketExists(s3Client, 'production');
 
       // Upload a test file to production bucket
+      // eslint-disable-next-line @typescript-eslint/naming-convention
       const { PutObjectCommand } = await import('@aws-sdk/client-s3');
       await s3Client.send(
         new PutObjectCommand({
