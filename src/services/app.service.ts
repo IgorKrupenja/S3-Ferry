@@ -13,10 +13,10 @@ import {
   DeleteFileBodyDto,
   FileDto,
   LocalFilesListMetaDto,
-  StorageAccountDto,
-  SignedUrlUploadRequestDto,
   SignedUrlDownloadRequestDto,
   SignedUrlResponseDto,
+  SignedUrlUploadRequestDto,
+  StorageAccountDto,
 } from '../common/dtos';
 import { StorageType } from '../common/enums';
 import {
@@ -213,12 +213,11 @@ export class AppService {
   ): Promise<SignedUrlResponseDto> {
     try {
       const bucket = data.bucket || 'production';
-      const { url, expiresAt } =
-        await this.s3Service.generateSignedDownloadUrl(
-          data.fileName,
-          bucket,
-          3600, // 1 hour expiration
-        );
+      const { url, expiresAt } = await this.s3Service.generateSignedDownloadUrl(
+        data.fileName,
+        bucket,
+        3600, // 1 hour expiration
+      );
 
       return {
         url,

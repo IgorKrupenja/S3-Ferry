@@ -19,10 +19,10 @@ import {
   FileDto,
   ListFilesQueryDto,
   LocalFilesListMetaDto,
-  StorageAccountDto,
-  SignedUrlUploadRequestDto,
   SignedUrlDownloadRequestDto,
   SignedUrlResponseDto,
+  SignedUrlUploadRequestDto,
+  StorageAccountDto,
 } from './common/dtos';
 import { RequestLogger } from './common/interceptors';
 import { AppService } from './services';
@@ -91,10 +91,10 @@ export class AppController {
     @Body() data: SignedUrlUploadRequestDto,
   ): Promise<SignedUrlResponseDto> {
     const result = await this.appService.generateSignedUploadUrl(data);
-    
+
     // Trigger AV scan simulation in background (fire and forget)
     void this.appService.simulateAvScan(data.fileName);
-    
+
     return result;
   }
 
