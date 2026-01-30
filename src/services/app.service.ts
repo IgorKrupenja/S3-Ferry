@@ -14,6 +14,9 @@ import {
   FileDto,
   LocalFilesListMetaDto,
   StorageAccountDto,
+  SignedUrlUploadRequestDto,
+  SignedUrlDownloadRequestDto,
+  SignedUrlResponseDto,
 } from '../common/dtos';
 import { StorageType } from '../common/enums';
 import {
@@ -176,6 +179,90 @@ export class AppService {
       throw new InternalServerException(
         `Failed to delete file: ${error instanceof Error ? error.message : String(error)}`,
       );
+    }
+  }
+
+  async generateSignedUploadUrl(
+    data: SignedUrlUploadRequestDto,
+  ): Promise<SignedUrlResponseDto> {
+    try {
+      const bucket = data.bucket || 'quarantine';
+      const { url, expiresAt } = await this.s3Service.generateSignedUploadUrl(
+        data.fileName,
+        data.mimeType,
+        bucket,
+        3600, // 1 hour expiration
+      );
+
+      return {
+        url,
+        expiresAt,
+        bucket,
+        key: data.fileName,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Generating signed upload URL failed: ${error instanceof Error ? error.stack : String(error)}`,
+      );
+      throw new InternalServerException('Failed to generate upload URL');
+    }
+  }
+
+  async generateSignedDownloadUrl(
+    data: SignedUrlDownloadRequestDto,
+  ): Promise<SignedUrlResponseDto> {
+    try {
+      const bucket = data.bucket || 'production';
+      const { url, expiresAt } =
+        await this.s3Service.generateSignedDownloadUrl(
+          data.fileName,
+          bucket,
+          3600, // 1 hour expiration
+        );
+
+      return {
+        url,
+        expiresAt,
+        bucket,
+        key: data.fileName,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Generating signed download URL failed: ${error instanceof Error ? error.stack : String(error)}`,
+      );
+      throw new InternalServerException('Failed to generate download URL');
+    }
+  }
+
+  async simulateAvScan(fileName: string): Promise<void> {
+    // Simulate AV scan delay (5 seconds)
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+
+    try {
+      // Move file from quarantine to production bucket
+      await this.s3Service.moveFile(
+        fileName,
+        'quarantine',
+        fileName,
+        'production',
+      );
+
+      this.logger.log(
+        `File ${fileName} passed AV scan and moved to production bucket`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `AV scan simulation failed for ${fileName}: ${error instanceof Error ? error.stack : String(error)}`,
+      );
+      // In case of failure, delete the file from quarantine
+      try {
+        await this.s3Service.deleteFile(fileName, 'quarantine');
+      } catch (deleteError) {
+        this.logger.error(
+          `Failed to delete file ${fileName} from quarantine: ${deleteError instanceof Error ? deleteError.stack : String(deleteError)}`,
+        );
+      }
+      throw new InternalServerException('AV scan failed');
     }
   }
 }

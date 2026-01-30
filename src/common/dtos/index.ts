@@ -6,3 +6,6 @@ export * from './file.dto';
 export * from './list-files-query.dto';
 export * from './local-files-list-meta.dto';
 export * from './storage-account.dto';
+export * from './signed-url-upload-request.dto';
+export * from './signed-url-download-request.dto';
+export * from './signed-url-response.dto';

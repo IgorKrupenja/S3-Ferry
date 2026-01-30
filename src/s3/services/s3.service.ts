@@ -7,7 +7,10 @@ import {
   NoSuchKey,
   PutObjectCommand,
   S3,
+  CopyObjectCommand,
+  DeleteObjectCommand,
 } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Inject, Injectable } from '@nestjs/common';
 
 import {
@@ -113,6 +116,73 @@ export class S3Service {
         Bucket: this.config.dataBucketName,
         Body: fileBuffer,
         Key: path.join(this.config.dataBucketPath, destinationFilePath),
+      }),
+    );
+  }
+
+  async generateSignedUploadUrl(
+    fileName: string,
+    mimeType: string,
+    bucket: string,
+    expiresIn: number = 3600,
+  ): Promise<{ url: string; expiresAt: string }> {
+    const command = new PutObjectCommand({
+      Bucket: bucket,
+      Key: fileName,
+      ContentType: mimeType,
+    });
+
+    const url = await getSignedUrl(this.s3, command, { expiresIn });
+    const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
+
+    return { url, expiresAt };
+  }
+
+  async generateSignedDownloadUrl(
+    fileName: string,
+    bucket: string,
+    expiresIn: number = 3600,
+  ): Promise<{ url: string; expiresAt: string }> {
+    const command = new GetObjectCommand({
+      Bucket: bucket,
+      Key: fileName,
+    });
+
+    const url = await getSignedUrl(this.s3, command, { expiresIn });
+    const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
+
+    return { url, expiresAt };
+  }
+
+  async moveFile(
+    sourceKey: string,
+    sourceBucket: string,
+    destinationKey: string,
+    destinationBucket: string,
+  ): Promise<void> {
+    // Copy the object to the destination
+    await this.s3.send(
+      new CopyObjectCommand({
+        CopySource: `${sourceBucket}/${sourceKey}`,
+        Bucket: destinationBucket,
+        Key: destinationKey,
+      }),
+    );
+
+    // Delete the source object
+    await this.s3.send(
+      new DeleteObjectCommand({
+        Bucket: sourceBucket,
+        Key: sourceKey,
+      }),
+    );
+  }
+
+  async deleteFile(key: string, bucket: string): Promise<void> {
+    await this.s3.send(
+      new DeleteObjectCommand({
+        Bucket: bucket,
+        Key: key,
       }),
     );
   }

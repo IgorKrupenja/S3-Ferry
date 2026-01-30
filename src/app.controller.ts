@@ -20,6 +20,9 @@ import {
   ListFilesQueryDto,
   LocalFilesListMetaDto,
   StorageAccountDto,
+  SignedUrlUploadRequestDto,
+  SignedUrlDownloadRequestDto,
+  SignedUrlResponseDto,
 } from './common/dtos';
 import { RequestLogger } from './common/interceptors';
 import { AppService } from './services';
@@ -78,5 +81,30 @@ export class AppController {
   @ApiOperation({ summary: 'Delete a file from storage' })
   async deleteFile(@Body() data: DeleteFileBodyDto): Promise<void> {
     return this.appService.deleteFile(data);
+  }
+
+  @Version('1')
+  @Post('/files/signed-url/upload')
+  @ApiOkResponse({ type: SignedUrlResponseDto })
+  @ApiOperation({ summary: 'Generate signed URL for file upload' })
+  async generateSignedUploadUrl(
+    @Body() data: SignedUrlUploadRequestDto,
+  ): Promise<SignedUrlResponseDto> {
+    const result = await this.appService.generateSignedUploadUrl(data);
+    
+    // Trigger AV scan simulation in background (fire and forget)
+    void this.appService.simulateAvScan(data.fileName);
+    
+    return result;
+  }
+
+  @Version('1')
+  @Post('/files/signed-url/download')
+  @ApiOkResponse({ type: SignedUrlResponseDto })
+  @ApiOperation({ summary: 'Generate signed URL for file download' })
+  async generateSignedDownloadUrl(
+    @Body() data: SignedUrlDownloadRequestDto,
+  ): Promise<SignedUrlResponseDto> {
+    return this.appService.generateSignedDownloadUrl(data);
   }
 }
