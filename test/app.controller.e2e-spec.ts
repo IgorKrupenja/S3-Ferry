@@ -774,6 +774,21 @@ describe('AppController (e2e)', () => {
 
       expect(status).toBe(HttpStatus.BAD_REQUEST);
     });
+
+    it('should fail when file size exceeds maximum allowed', async () => {
+      const data = {
+        fileName: 'huge-file.pdf',
+        fileSize: 20971520, // 20MB, exceeds 10MB limit
+        mimeType: 'application/pdf',
+      };
+
+      const { status, body } = await request(app.getHttpServer())
+        .post('/v1/files/signed-url/upload')
+        .send(data);
+
+      expect(status).toBe(HttpStatus.BAD_REQUEST);
+      expect(body.message).toContain('exceeds maximum allowed size');
+    });
   });
 
   describe('POST /v1/files/signed-url/download', () => {

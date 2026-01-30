@@ -11,7 +11,7 @@ import {
   S3,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 
 import {
   DataWithMetaResponseDto,
@@ -124,12 +124,26 @@ export class S3Service {
     fileName: string,
     mimeType: string,
     bucket: string,
+    fileSize: number,
+    maxFileSize: number = 10485760, // 10MB default
     expiresIn: number = 3600,
   ): Promise<{ url: string; expiresAt: string }> {
+    // Validate file size
+    if (fileSize > maxFileSize) {
+      throw new BadRequestException(
+        `File size ${fileSize} bytes exceeds maximum allowed size of ${maxFileSize} bytes`,
+      );
+    }
+
+    if (fileSize <= 0) {
+      throw new BadRequestException('File size must be greater than 0');
+    }
+
     const command = new PutObjectCommand({
       Bucket: bucket,
       Key: fileName,
       ContentType: mimeType,
+      ContentLength: fileSize, // Enforce exact file size
     });
 
     const url = await getSignedUrl(this.s3, command, { expiresIn });

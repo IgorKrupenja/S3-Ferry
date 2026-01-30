@@ -191,6 +191,8 @@ export class AppService {
         data.fileName,
         data.mimeType,
         bucket,
+        data.fileSize,
+        10485760, // 10MB max file size
         3600, // 1 hour expiration
       );
 
@@ -201,6 +203,10 @@ export class AppService {
         key: data.fileName,
       };
     } catch (error) {
+      // Re-throw BadRequestException for validation errors
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
       this.logger.error(
         `Generating signed upload URL failed: ${error instanceof Error ? error.stack : String(error)}`,
       );
