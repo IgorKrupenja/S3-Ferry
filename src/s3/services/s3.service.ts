@@ -11,7 +11,7 @@ import {
   S3,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 
 import {
   DataWithMetaResponseDto,
@@ -24,6 +24,7 @@ import { S3Config } from '../config/s3.config.interface';
 
 @Injectable()
 export class S3Service {
+  private readonly logger = new Logger(S3Service.name);
   private readonly s3: S3;
 
   constructor(@Inject(s3ConfigFactory.KEY) private readonly config: S3Config) {
@@ -130,14 +131,24 @@ export class S3Service {
   ): Promise<{ url: string; expiresAt: string }> {
     // Validate file size
     if (fileSize > maxFileSize) {
+      this.logger.warn(
+        `[POC-ATTACHMENTS] File size validation failed - fileName: ${fileName}, fileSize: ${fileSize}, maxFileSize: ${maxFileSize}`,
+      );
       throw new BadRequestException(
         `File size ${fileSize} bytes exceeds maximum allowed size of ${maxFileSize} bytes`,
       );
     }
 
     if (fileSize <= 0) {
+      this.logger.warn(
+        `[POC-ATTACHMENTS] Invalid file size - fileName: ${fileName}, fileSize: ${fileSize}`,
+      );
       throw new BadRequestException('File size must be greater than 0');
     }
+
+    this.logger.log(
+      `[POC-ATTACHMENTS] Creating S3 signed URL - fileName: ${fileName}, bucket: ${bucket}, fileSize: ${fileSize}, mimeType: ${mimeType}`,
+    );
 
     const command = new PutObjectCommand({
       Bucket: bucket,
@@ -149,6 +160,10 @@ export class S3Service {
     const url = await getSignedUrl(this.s3, command, { expiresIn });
     const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
 
+    this.logger.log(
+      `[POC-ATTACHMENTS] S3 signed upload URL created - fileName: ${fileName}, bucket: ${bucket}, expiresIn: ${expiresIn}s`,
+    );
+
     return { url, expiresAt };
   }
 
@@ -157,6 +172,10 @@ export class S3Service {
     bucket: string,
     expiresIn: number = 3600,
   ): Promise<{ url: string; expiresAt: string }> {
+    this.logger.log(
+      `[POC-ATTACHMENTS] Creating S3 signed download URL - fileName: ${fileName}, bucket: ${bucket}`,
+    );
+
     const command = new GetObjectCommand({
       Bucket: bucket,
       Key: fileName,
@@ -164,6 +183,10 @@ export class S3Service {
 
     const url = await getSignedUrl(this.s3, command, { expiresIn });
     const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
+
+    this.logger.log(
+      `[POC-ATTACHMENTS] S3 signed download URL created - fileName: ${fileName}, bucket: ${bucket}, expiresIn: ${expiresIn}s`,
+    );
 
     return { url, expiresAt };
   }
@@ -174,6 +197,10 @@ export class S3Service {
     destinationKey: string,
     destinationBucket: string,
   ): Promise<void> {
+    this.logger.log(
+      `[POC-ATTACHMENTS] Moving file in S3 - from: ${sourceBucket}/${sourceKey}, to: ${destinationBucket}/${destinationKey}`,
+    );
+
     // Copy the object to the destination
     await this.s3.send(
       new CopyObjectCommand({
@@ -190,14 +217,26 @@ export class S3Service {
         Key: sourceKey,
       }),
     );
+
+    this.logger.log(
+      `[POC-ATTACHMENTS] File moved successfully - fileName: ${destinationKey}`,
+    );
   }
 
   async deleteFile(key: string, bucket: string): Promise<void> {
+    this.logger.log(
+      `[POC-ATTACHMENTS] Deleting file from S3 - bucket: ${bucket}, key: ${key}`,
+    );
+
     await this.s3.send(
       new DeleteObjectCommand({
         Bucket: bucket,
         Key: key,
       }),
+    );
+
+    this.logger.log(
+      `[POC-ATTACHMENTS] File deleted successfully - bucket: ${bucket}, key: ${key}`,
     );
   }
 }

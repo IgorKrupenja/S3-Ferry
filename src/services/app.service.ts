@@ -192,6 +192,11 @@ export class AppService {
   ): Promise<SignedUrlResponseDto> {
     try {
       const bucket = data.bucket || 'quarantine';
+
+      this.logger.log(
+        `[POC-ATTACHMENTS] Generating signed upload URL - fileName: ${data.fileName}, fileSize: ${data.fileSize}, mimeType: ${data.mimeType}, bucket: ${bucket}`,
+      );
+
       const { url, expiresAt } = await this.s3Service.generateSignedUploadUrl(
         data.fileName,
         data.mimeType,
@@ -199,6 +204,10 @@ export class AppService {
         data.fileSize,
         this.appConfig.maxFileSize,
         3600, // 1 hour expiration
+      );
+
+      this.logger.log(
+        `[POC-ATTACHMENTS] Signed upload URL generated successfully - fileName: ${data.fileName}, bucket: ${bucket}, expiresAt: ${expiresAt}`,
       );
 
       return {
@@ -210,10 +219,13 @@ export class AppService {
     } catch (error) {
       // Re-throw BadRequestException for validation errors
       if (error instanceof BadRequestException) {
+        this.logger.warn(
+          `[POC-ATTACHMENTS] Validation failed - fileName: ${data.fileName}, error: ${error.message}`,
+        );
         throw error;
       }
       this.logger.error(
-        `Generating signed upload URL failed: ${error instanceof Error ? error.stack : String(error)}`,
+        `[POC-ATTACHMENTS] Generating signed upload URL failed - fileName: ${data.fileName}, error: ${error instanceof Error ? error.stack : String(error)}`,
       );
       throw new InternalServerException('Failed to generate upload URL');
     }
@@ -224,10 +236,19 @@ export class AppService {
   ): Promise<SignedUrlResponseDto> {
     try {
       const bucket = data.bucket || 'production';
+
+      this.logger.log(
+        `[POC-ATTACHMENTS] Generating signed download URL - fileName: ${data.fileName}, bucket: ${bucket}`,
+      );
+
       const { url, expiresAt } = await this.s3Service.generateSignedDownloadUrl(
         data.fileName,
         bucket,
         3600, // 1 hour expiration
+      );
+
+      this.logger.log(
+        `[POC-ATTACHMENTS] Signed download URL generated successfully - fileName: ${data.fileName}, bucket: ${bucket}, expiresAt: ${expiresAt}`,
       );
 
       return {
@@ -238,13 +259,17 @@ export class AppService {
       };
     } catch (error) {
       this.logger.error(
-        `Generating signed download URL failed: ${error instanceof Error ? error.stack : String(error)}`,
+        `[POC-ATTACHMENTS] Generating signed download URL failed - fileName: ${data.fileName}, error: ${error instanceof Error ? error.stack : String(error)}`,
       );
       throw new InternalServerException('Failed to generate download URL');
     }
   }
 
   async simulateAvAndMimeScan(fileName: string): Promise<void> {
+    this.logger.log(
+      `[POC-ATTACHMENTS] Starting AV scan simulation - fileName: ${fileName}`,
+    );
+    
     // Simulate AV scan delay (5 seconds)
     await new Promise((resolve) => setTimeout(resolve, 5000));
 
@@ -258,18 +283,21 @@ export class AppService {
       );
 
       this.logger.log(
-        `File ${fileName} passed AV scan and moved to production bucket`,
+        `[POC-ATTACHMENTS] AV scan passed, file moved to production - fileName: ${fileName}`,
       );
     } catch (error) {
       this.logger.error(
-        `AV scan simulation failed for ${fileName}: ${error instanceof Error ? error.stack : String(error)}`,
+        `[POC-ATTACHMENTS] AV scan simulation failed - fileName: ${fileName}, error: ${error instanceof Error ? error.stack : String(error)}`,
       );
       // In case of failure, delete the file from quarantine
       try {
         await this.s3Service.deleteFile(fileName, 'quarantine');
+        this.logger.log(
+          `[POC-ATTACHMENTS] Quarantine file deleted after AV scan failure - fileName: ${fileName}`,
+        );
       } catch (deleteError) {
         this.logger.error(
-          `Failed to delete file ${fileName} from quarantine: ${deleteError instanceof Error ? deleteError.stack : String(deleteError)}`,
+          `[POC-ATTACHMENTS] Failed to delete quarantine file - fileName: ${fileName}, error: ${deleteError instanceof Error ? deleteError.stack : String(deleteError)}`,
         );
       }
       throw new InternalServerException('AV scan failed');
