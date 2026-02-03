@@ -264,43 +264,4 @@ export class AppService {
       throw new InternalServerException('Failed to generate download URL');
     }
   }
-
-  async simulateAvAndMimeScan(fileName: string): Promise<void> {
-    this.logger.log(
-      `[POC-ATTACHMENTS] Starting AV scan simulation - fileName: ${fileName}`,
-    );
-    
-    // Simulate AV scan delay (5 seconds)
-    await new Promise((resolve) => setTimeout(resolve, 5000));
-
-    try {
-      // Move file from quarantine to production bucket
-      await this.s3Service.moveFile(
-        fileName,
-        'quarantine',
-        fileName,
-        'production',
-      );
-
-      this.logger.log(
-        `[POC-ATTACHMENTS] AV scan passed, file moved to production - fileName: ${fileName}`,
-      );
-    } catch (error) {
-      this.logger.error(
-        `[POC-ATTACHMENTS] AV scan simulation failed - fileName: ${fileName}, error: ${error instanceof Error ? error.stack : String(error)}`,
-      );
-      // In case of failure, delete the file from quarantine
-      try {
-        await this.s3Service.deleteFile(fileName, 'quarantine');
-        this.logger.log(
-          `[POC-ATTACHMENTS] Quarantine file deleted after AV scan failure - fileName: ${fileName}`,
-        );
-      } catch (deleteError) {
-        this.logger.error(
-          `[POC-ATTACHMENTS] Failed to delete quarantine file - fileName: ${fileName}, error: ${deleteError instanceof Error ? deleteError.stack : String(deleteError)}`,
-        );
-      }
-      throw new InternalServerException('AV scan failed');
-    }
-  }
 }

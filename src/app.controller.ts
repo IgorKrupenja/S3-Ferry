@@ -94,7 +94,6 @@ export class AppController {
 
     // TODO: In production, AV scan would be triggered by S3 event after upload completes
     // For PoC, we skip automatic trigger since file isn't uploaded yet
-    // The simulateAvAndMimeScan method exists and can be called manually/via cron/webhook
 
     return result;
   }
