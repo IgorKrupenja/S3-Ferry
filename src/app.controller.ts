@@ -92,9 +92,9 @@ export class AppController {
   ): Promise<SignedUrlResponseDto> {
     const result = await this.appService.generateSignedUploadUrl(data);
 
-    // Trigger AV scan simulation in background (fire and forget)
-    // TODO: This is only a quick PoC to simulate AV and MIME scan
-    void this.appService.simulateAvAndMimeScan(data.fileName);
+    // TODO: In production, AV scan would be triggered by S3 event after upload completes
+    // For PoC, we skip automatic trigger since file isn't uploaded yet
+    // The simulateAvAndMimeScan method exists and can be called manually/via cron/webhook
 
     return result;
   }
