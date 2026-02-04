@@ -162,7 +162,17 @@ export class S3Service {
       ContentLength: fileSize, // Enforce exact file size
     });
 
-    const url = await getSignedUrl(this.s3, command, { expiresIn });
+    let url = await getSignedUrl(this.s3, command, { expiresIn });
+
+    // Replace internal endpoint URL with public endpoint URL for browser access
+    if (
+      this.config.endpointUrl &&
+      this.config.publicEndpointUrl &&
+      this.config.endpointUrl !== this.config.publicEndpointUrl
+    ) {
+      url = url.replace(this.config.endpointUrl, this.config.publicEndpointUrl);
+    }
+
     const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
 
     this.logger.log(
@@ -186,7 +196,17 @@ export class S3Service {
       Key: fileName,
     });
 
-    const url = await getSignedUrl(this.s3, command, { expiresIn });
+    let url = await getSignedUrl(this.s3, command, { expiresIn });
+
+    // Replace internal endpoint URL with public endpoint URL for browser access
+    if (
+      this.config.endpointUrl &&
+      this.config.publicEndpointUrl &&
+      this.config.endpointUrl !== this.config.publicEndpointUrl
+    ) {
+      url = url.replace(this.config.endpointUrl, this.config.publicEndpointUrl);
+    }
+
     const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
 
     this.logger.log(

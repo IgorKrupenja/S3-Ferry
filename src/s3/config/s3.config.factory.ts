@@ -10,6 +10,7 @@ export const s3ConfigFactory = registerAs('s3', (): S3Config => {
   return {
     region: <string>env['S3_REGION'],
     endpointUrl: <string>env['S3_ENDPOINT_URL'],
+    publicEndpointUrl: <string>env['S3_PUBLIC_ENDPOINT_URL'] || <string>env['S3_ENDPOINT_URL'],
     accessKeyId: <string>env['S3_ACCESS_KEY_ID'],
     secretAccessKey: <string>env['S3_SECRET_ACCESS_KEY'],
     dataBucketName: <string>env['S3_DATA_BUCKET_NAME'],
